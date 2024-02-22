@@ -1,0 +1,30 @@
+{
+  "versions": [
+    "rhos-17.1-rhel-8",
+    "rhos-17.1-rhel-9"
+  ],
+  "core_packages": [
+    "aodh",
+    "barbican",
+    "ceilometer",
+    "cinder",
+    "glance",
+    "gnochhi",
+    "heat",
+    "horizon",
+    "ironic",
+    "keystone",
+    "manila",
+    "neutron",
+    "nova",
+    "octavia",
+    "openstack",
+    "oslo",
+    "osp-",
+    "ovn",
+    "redhat",
+    "rhosp",
+    "swift",
+    "tripleo"
+  ]
+}
