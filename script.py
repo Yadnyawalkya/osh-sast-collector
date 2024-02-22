@@ -16,5 +16,5 @@ for version in versions:
     package_names = command_output.stdout.split('\n')[2:]  # Skip the first two lines
 
     for package_name in package_names:
-        download_command = ['brew', 'download-build', '--noprogress', '--arch=src', '-d', version_dir, package_name]
+        download_command = ['brew', 'download-build', '--noprogress', '--arch=src', version_dir, package_name]
         subprocess.run(download_command)
