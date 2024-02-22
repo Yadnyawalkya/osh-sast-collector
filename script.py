@@ -15,9 +15,11 @@ for version in versions:
 
     list_command = ['brew', 'latest-pkg', '--all', version]
     command_output = subprocess.run(list_command, capture_output=True, text=True)
-
-    package_names = command_output.stdout.split('\n')[2:]  # Skip the first two lines
+    output_lines = command_output.stdout.strip().split('\n')[2:]
+    package_names = [line.split()[0] for line in output_lines]
 
     for package_name in package_names:
         download_command = ['brew', 'download-build', '--noprogress', '--arch=src', package_name]
         subprocess.run(download_command)
+    
+    os.chdir(original_dir)
