@@ -24,7 +24,7 @@ def download_packages(version_dir, package_names, manifest_tasklists):
     for package_name in package_names:
         if not lookup_in_manifest(package_name, manifest_tasklists):
             download_command = ['brew', 'download-build', '--noprogress', '--arch=src',package_name]
-            output = subprocess.run(download_command, capture_output=True, text=True)
+            output = subprocess.run(download_command, capture_output=True, text=True).stdout
             if exclude_text in output: # gathering list of packages which are not downloaded
                 excluded_packages.append(output.split(exclude_text)[1])
 

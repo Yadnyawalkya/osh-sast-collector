@@ -1,0 +1,18 @@
+adding way to generate local manifest from osh
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# Date:      Fri Feb 23 13:26:40 2024 +0530
+#
+# On branch master
+# Changes to be committed:
+#	modified:   config.json
+#	new file:   local_manifest.py
+#	modified:   main_script.py
+#	new file:   manifest.txt
+#	deleted:    read_manifest.py
+#
+# Changes not staged for commit:
+#	deleted:    __pycache__/read_manifest.cpython-312.pyc
+#
