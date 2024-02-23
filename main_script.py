@@ -2,7 +2,7 @@ import subprocess
 import os
 import json
 import hashlib
-from read_manifest import get_manifest
+from local_manifest import get_manifest, create_manifest
 
 def lookup_in_manifest(package_name, manifest_tasklists):
     lookup_result = find_packages(package_name)
@@ -18,24 +18,33 @@ def read_config():
         return json.load(config_file)
 
 def download_packages(version_dir, package_names, manifest_tasklists):
+    excluded_packages = []
+    exclude_text = "No src packages available for "
     os.chdir(version_dir)
     for package_name in package_names:
         if not lookup_in_manifest(package_name, manifest_tasklists):
             download_command = ['brew', 'download-build', '--noprogress', '--arch=src',package_name]
-            subprocess.run(download_command)
+            output = subprocess.run(download_command, capture_output=True, text=True)
+            if exclude_text in output: # gathering list of packages which are not downloaded
+                excluded_packages.append(output.split(exclude_text)[1])
+
+    if excluded_packages: # printing if there is list has excluded packages
+        print("=> Following packages were not able to get downloaded:\n")
+        for package_name in excluded_packages:
+            print(package_name)
 
 def scan_packages(version_dir, package_names, random_hash):
     os.chdir(version_dir)
     for package_name in package_names:
         scan_command = [
-            'osh-cli', 'mock-build', '--priority=0', 
-            '--comment={}'.format(random_hash), 
+            'osh-cli', 'mock-build', '--priority=0',
+            '--comment={}'.format(random_hash),
             "./{}".format(package_name)
         ]
         subprocess.run(scan_command)
 
 def find_packages(package_name, latest=False):
-    scan_command = ['osh-cli', 'find-tasks', "--states=CLOSED", "{}".format(package_name)]
+    scan_command = ['osh-cli', 'find-tasks', "--states=CLOSED", "--latest", "{}".format(package_name)]
     output = subprocess.run(scan_command, capture_output=True, text=True)
     output_lines = output.stdout.splitlines()
     task_ids = [int(line.split()[0]) for line in output_lines] if output_lines else []
@@ -48,10 +57,11 @@ def find_packages(package_name, latest=False):
         return task_ids # return 1 or more tasks ids
 
 def main():
+    config_data = read_config()
     random_hash = hashlib.sha256(os.urandom(32)).hexdigest()[:6]
+    create_manifest(config_data['rpm_extensions'])
     manifest_tasklists = get_manifest()
     original_dir = os.getcwd()
-    config_data = read_config()
     versions = config_data['versions']
 
     for version in versions:
