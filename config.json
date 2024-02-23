@@ -1,5 +1,5 @@
 {
-  "versions": [
+  "brew_tags": [
     "rhos-17.1-rhel-8",
     "rhos-17.1-rhel-9"
   ],
