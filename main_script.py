@@ -72,6 +72,7 @@ def main():
         package_names = [line.split()[0] for line in output_lines]
         download_and_scan_packages(version_dir, package_names, manifest_tasklists)
         os.chdir(original_dir)
+    config_data["scan_id"] = scan_id
 
 if __name__ == "__main__":
     main()
