@@ -3,6 +3,7 @@ import os
 import json
 import hashlib
 from local_manifest import get_manifest, create_manifest
+from package_action import find_packages
 
 def lookup_in_manifest(package_name, manifest_tasklists):
     lookup_result = find_packages(package_name)
@@ -40,19 +41,6 @@ def download_and_scan_packages(version_dir, package_names, manifest_tasklists):
         print("=> Following packages were not able to get downloaded:\n")
         for package_name in excluded_packages:
             print(package_name)
-
-def find_packages(package_name, latest=False):
-    scan_command = ['osh-cli', 'find-tasks', "--states=CLOSED", "--latest", "{}".format(package_name)]
-    output = subprocess.run(scan_command, capture_output=True, text=True)
-    output_lines = output.stdout.splitlines()
-    task_ids = [int(line.split()[0]) for line in output_lines] if output_lines else []
-
-    if latest:
-        sorted_task_ids = sorted(task_ids)
-        max_task_id = sorted_task_ids[-1] if sorted_task_ids else None
-        return max_task_id # when latest=True returns single maximum/latest taskid
-    else:
-        return task_ids # return 1 or more tasks ids
 
 def main():
     config_data = read_config()
