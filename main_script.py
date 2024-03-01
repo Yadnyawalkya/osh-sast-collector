@@ -29,17 +29,18 @@ def download_and_scan_packages(version_dir, package_names, manifest_tasklists, s
         if lookup_in_manifest(package_name, manifest_tasklists):
             continue
         else:
-            download_command = ['brew', 'download-build', '--noprogress', '--arch=src',package_name]
+            download_command = ['brew', 'download-build', '--noprogress', '--arch=src', package_name]
             output = subprocess.run(download_command, capture_output=True, text=True).stdout
             if exclude_text in output: # gathering list of packages which are not downloaded
                 excluded_packages.append(output.split(exclude_text)[1])
-            scan_command = [
-            'osh-cli', 'mock-build', '--priority=0',
-            '--comment={}'.format(scan_id),
-            "./{}".format(package_name)
-            ]
-            scanned_output = subprocess.run(scan_command)
-            print(scanned_output)
+            for file_name in os.listdir():
+                scan_command = [
+                'osh-cli', 'mock-build', '--priority=0',
+                '--comment={}'.format(scan_id),
+                "./{}".format(file_name)
+                ]
+                scanned_output = subprocess.run(scan_command)
+                print(scanned_output)
 
     if excluded_packages: # printing if there is list has excluded packages
         print("=> Following packages were not able to get downloaded:\n")
@@ -55,7 +56,6 @@ def generate_report():
 
 def main():
     config_data = read_config()
-    scan_id = hashlib.sha256(os.urandom(32)).hexdigest()[:6]
     create_manifest(config_data['rpm_extensions'])
     manifest_tasklists = get_manifest()
     original_dir = os.getcwd()
@@ -64,6 +64,7 @@ def main():
     for version in brew_tags:
         version_dir = os.path.join(original_dir, version)
         os.makedirs(version_dir, exist_ok=True)
+        scan_id = "{}-{}".format(version, hashlib.sha256(os.urandom(32)).hexdigest()[:6])
 
         list_command = ['brew', 'latest-pkg', '--all', version]
         command_output = subprocess.run(list_command, capture_output=True, text=True)
@@ -71,7 +72,6 @@ def main():
         package_names = [line.split()[0] for line in output_lines]
         download_and_scan_packages(version_dir, package_names, manifest_tasklists, scan_id)
         os.chdir(original_dir)
-    config_data["scan_id"] = scan_id
 
 if __name__ == "__main__":
     main()
