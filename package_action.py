@@ -1,6 +1,6 @@
 import subprocess
 
-def find_packages(package_name, latest=False):
+def find_package(package_name, latest=False):
     scan_command = ['osh-cli', 'find-tasks', "--states=CLOSED", "--latest", "{}".format(package_name)]
     output = subprocess.run(scan_command, capture_output=True, text=True)
     output_lines = output.stdout.splitlines()
@@ -12,3 +12,10 @@ def find_packages(package_name, latest=False):
         return max_task_id # when latest=True returns single maximum/latest taskid
     else:
         return task_ids # return 1 or more tasks ids
+
+def get_package_list(version):
+    list_command = ['brew', 'latest-pkg', '--all', version]
+    command_output = subprocess.run(list_command, capture_output=True, text=True)
+    output_lines = command_output.stdout.strip().split('\n')[2:]
+    package_names = [line.split()[0] for line in output_lines]
+    return package_names

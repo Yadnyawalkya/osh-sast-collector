@@ -3,12 +3,12 @@ import os
 import json
 import hashlib
 from local_manifest import get_manifest, create_manifest
-from package_action import find_packages
+from package_action import find_package, get_package_list
 
 TASK_LIST = []
 
 def lookup_in_manifest(package_name, manifest_tasklists):
-    lookup_result = find_packages(package_name)
+    lookup_result = find_package(package_name)
     for i in lookup_result:
         if i in manifest_tasklists:
             print("=> {}: Scan is already done! ".format(i))
@@ -36,7 +36,7 @@ def download_and_scan_packages(version_dir, package_names, manifest_tasklists, s
             for file_name in os.listdir():
                 scan_command = [
                 'osh-cli', 'mock-build', '--priority=0',
-                '--comment={}'.format(scan_id),
+                '--comment={}'.format(scan_id), "--config=rhos-rhel-8-x86_64.cfg",
                 "./{}".format(file_name)
                 ]
                 scanned_output = subprocess.run(scan_command)
@@ -46,30 +46,28 @@ def download_and_scan_packages(version_dir, package_names, manifest_tasklists, s
         print("=> Following packages were not able to get downloaded:\n")
         for package_name in excluded_packages:
             print(package_name)
+
     
-def generate_report():
-    os.makedirs("reports", exist_ok=True)
-    print(TASK_LIST)
-    for taskid in TASK_LIST:
-        download_command = ["osh-cli", "download-results", {taskid}, "-d", "reports"]
-        subprocess.run(download_command, capture_output=True, text=True).stdout
+# def generate_report():
+#     os.makedirs("reports", exist_ok=True)
+#     print(TASK_LIST)
+#     for taskid in TASK_LIST:
+#         download_command = ["osh-cli", "download-results", {taskid}, "-d", "reports"]
+#         subprocess.run(download_command, capture_output=True, text=True).stdout
 
 def main():
     config_data = read_config()
     create_manifest(config_data['rpm_extensions'])
     manifest_tasklists = get_manifest()
     original_dir = os.getcwd()
-    brew_tags = config_data['brew_tags']
+    #TODO: take argument later which decides wheather to scan 17.1 or 18 or both
+    brew_tags = config_data['brew_tags']["osp17.1"]
 
     for version in brew_tags:
         version_dir = os.path.join(original_dir, version)
         os.makedirs(version_dir, exist_ok=True)
         scan_id = "{}-{}".format(version, hashlib.sha256(os.urandom(32)).hexdigest()[:6])
-
-        list_command = ['brew', 'latest-pkg', '--all', version]
-        command_output = subprocess.run(list_command, capture_output=True, text=True)
-        output_lines = command_output.stdout.strip().split('\n')[2:]
-        package_names = [line.split()[0] for line in output_lines]
+        package_names = get_package_list(version)
         download_and_scan_packages(version_dir, package_names, manifest_tasklists, scan_id)
         os.chdir(original_dir)
 
