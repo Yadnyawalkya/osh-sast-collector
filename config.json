@@ -11,9 +11,9 @@
       "rhos-edpm-trunk-0.1-rhel-8-candidate"
       ]
   },
-  "rpm_extensions": [
-    "el8ost",
-    "el9ost"
+  "related_comments": [
+    "openstack",
+    "openstack-podified"
   ],
   "core_packages": [
     "aodh",
