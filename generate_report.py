@@ -55,16 +55,19 @@ def dep_cwe_logs(output_dir):
     # CWE list -- https://cwe.mitre.org/top25/archive/2023/2023_top25_list.html
     print(all_entries)
     for entry in all_entries:
-        cwe_number = "CWE-{}".format(int(re.findall(r"\(CWE-(\d+)\):", entry)[0]))
-        if cwe_number in config_data['cwe_priority']:
-            print(cwe_number)
-            output_dir_path = os.path.join(output_dir, 'top25-cwe-sorted.err')
-            with open(output_dir_path, 'w') as output_file:
-                output_file.write(entry)
-        else:
-            output_dir_path = os.path.join(output_dir, 'other-important.err')
-            with open(output_dir_path, 'w') as output_file:
-                output_file.write(entry)
+        try:
+            cwe_number = "CWE-{}".format(int(re.findall(r"\(CWE-(\d+)\):", entry)[0]))
+            if cwe_number in config_data['cwe_priority']:
+                print(cwe_number)
+                output_dir_path = os.path.join(output_dir, 'top25-cwe-sorted.err')
+                with open(output_dir_path, 'w') as output_file:
+                    output_file.write(entry)
+            else:
+                output_dir_path = os.path.join(output_dir, 'other-important.err')
+                with open(output_dir_path, 'w') as output_file:
+                    output_file.write(entry)
+        except IndexError:
+            pass
 
 def iterate_and_generate():
     # Iterate over brew tags
@@ -78,7 +81,7 @@ def iterate_and_generate():
                 print("=> {}: Scan found!".format(taskid))
                 download_command = ["osh-cli", "download-results", str(taskid), "-d", version_dir]
                 output = subprocess.run(download_command)
-                print("=> {}: Scan downloaded!".format(taskid))
+                print("=> {}: Scan report downloaded!".format(taskid))
                 TASK_LIST.append(taskid)
 
     # Process files in subdirectories
