@@ -22,6 +22,7 @@ create_manifest(config_data['related_comments'])
 manifest_tasklists = get_manifest()
 brew_tags = config_data['brew_tags']["osp17.1"]
 all_entries = []
+destination_path = 'all-results'
 
 def extract_scan_results_err(file_name, tar_file_path, core_dir, dep_dir):
     with tarfile.open(tar_file_path, 'r:xz') as tar:
@@ -47,6 +48,12 @@ def extract_scan_results_err(file_name, tar_file_path, core_dir, dep_dir):
                             dep_cwe_logs(output_dir)
                         with open(output_dir_path, 'w') as output_file:
                             output_file.write(contents)
+                        if not os.path.exists(destination_path):
+                            os.makedirs(destination_path)
+                        tar.extract(member, path=destination_path)
+                        # new_file_path = os.path.join(destination_path, f"{file_name}", "scan-results.err")
+                        os.rename(os.path.join(destination_path, member.name), os.path.join(destination_path, f"{member.name.split("/")[0]}-scan-results.err"))
+                        os.rmdir(os.path.join(destination_path, member.name.split("/")[0]))
 
 def dep_cwe_logs(output_dir):
     # inside root reports dir -- core vs dep structure
