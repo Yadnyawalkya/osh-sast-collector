@@ -3,6 +3,7 @@ import os
 import subprocess
 import tarfile
 import re
+import threading
 
 from local_manifest import create_manifest, get_manifest
 from package_action import find_package, get_package_list
@@ -55,6 +56,7 @@ def extract_scan_results_err(file_name, tar_file_path, core_dir, dep_dir):
                         os.rename(os.path.join(destination_path, member.name), os.path.join(destination_path, f"{member.name.split("/")[0]}-scan-results.err"))
                         os.rmdir(os.path.join(destination_path, member.name.split("/")[0]))
 
+
 def dep_cwe_logs(output_dir):
     # inside root reports dir -- core vs dep structure
     # with in dep dir strcture -- top25 cwe structure
@@ -75,6 +77,9 @@ def dep_cwe_logs(output_dir):
                     output_file.write(entry)
         except IndexError:
             pass
+
+def process_file(file_name, tar_file_path, core_dir, dep_dir):
+    extract_scan_results_err(file_name, tar_file_path, core_dir, dep_dir)
 
 def iterate_and_generate():
     # Iterate over brew tags
@@ -102,6 +107,7 @@ def iterate_and_generate():
                 dep_dir = os.path.join(parent_dir, 'dep_results_{}'.format(subdir))
                 os.makedirs(core_dir, exist_ok=True)
                 os.makedirs(dep_dir, exist_ok=True)
-                extract_scan_results_err(file_name, file_path, core_dir, dep_dir)
+                thread = threading.Thread(target=process_file, args=(file_name, file_path, core_dir, dep_dir))
+                thread.start()
 
 iterate_and_generate()
