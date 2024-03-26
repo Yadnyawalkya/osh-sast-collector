@@ -18,7 +18,7 @@ def create_manifest(related_comments):
         scan_command = ['osh-cli', 'find-tasks', '--states=CLOSED','-c', comment]
         output = subprocess.run(scan_command, capture_output=True, text=True).stdout
         numbers = [int(x) for x in output.split("\n") if x.strip()]
-        with open(MANIFEST_FILENAME, 'a') as manifest_file:
+        with open(MANIFEST_FILENAME, 'a+') as manifest_file:
             for number in numbers:
                 manifest_file.write(str(number) + '\n')
     print("=> Manifest file has been created at {}".format(os.path.abspath(MANIFEST_FILENAME)))

@@ -74,11 +74,11 @@ def dep_cwe_logs(file_name, contents, dep_dir):
             cwe_number = "CWE-{}".format(int(re.findall(r"\(CWE-(\d+)\):", entry)[0]))
             if cwe_number in config_data['cwe_priority']:
                 output_dir_path = os.path.join(dep_dir, 'top25-cwe-sorted.err')
-                with open(output_dir_path, 'w') as output_file:
+                with open(output_dir_path, 'a+') as output_file:
                     output_file.write(entry)
             else:
                 output_dir_path = os.path.join(dep_dir, 'other-important.err')
-                with open(output_dir_path, 'w') as output_file:
+                with open(output_dir_path, 'a+') as output_file:
                     output_file.write(entry)
         except IndexError:
             pass
