@@ -1,16 +1,15 @@
 {
-  "brew_tags": {
-    "osp17.1": [
+  "brew_tags": [[
       "rhos-17.1-rhel-8", 
       "rhos-17.1-rhel-9"
     ],
-    "osp18.0": [
+    [
       "rhos-18.0-rhel-9-candidate",
       "rhos-podified-trunk-0.1-rhel-9-candidate",
       "rhos-edpm-trunk-0.1-rhel-9-candidate",
       "rhos-edpm-trunk-0.1-rhel-8-candidate"
     ]
-  },
+  ],
   "related_comments": [
     "openstack",
     "openstack-podified"
