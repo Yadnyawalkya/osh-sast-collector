@@ -22,6 +22,7 @@ def create_manifest(related_comments):
             for number in numbers:
                 manifest_file.write(str(number) + '\n')
     print("=> Manifest file has been created at {}".format(os.path.abspath(MANIFEST_FILENAME)))
+    return os.path.abspath(MANIFEST_FILENAME)
 
 def lookup_in_manifest(package_name, manifest_tasklists):
     taskid = find_package(package_name)

@@ -18,8 +18,8 @@ latest_dir = os.path.join(root_dir, "latest")
 parent_dir = os.path.join(root_dir, f"reports-{current_datetime}")
 stats_file_name = f"stats-{current_datetime}.txt"
 temp_dir = os.path.join(parent_dir, "temp")
-excluded_packages = []
-total_components = {}
+total_excluded_components = {}
+total_package_count = {}
 os.makedirs(root_dir, exist_ok=True)
 os.makedirs(latest_dir, exist_ok=True)
 os.makedirs(parent_dir, exist_ok=True)
@@ -113,16 +113,22 @@ def download_and_append_task(package_name, version, manifest_tasklists):
         else:
             print(f"Failed to download scan report for task {taskid}")
     else:
-        total_components[version].append(package_name)
+        total_excluded_components[version].append(package_name)
     return None
     
+def write_and_print(file, content):
+    file.write(content)
+    print(content, end='')
+    file.write("\n\n")
+    print("\n\n")
+
 def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     compare_table = PrettyTable()
     compare_table.field_names = ["Version Tag", "Total component present", "Total components scanned", "Unscanned"]
-    for version_tag in total_components.keys() & d.keys():
+    for version_tag in total_excluded_components.keys() & d.keys() & total_package_count.keys():
         total_files = d[version_tag].get("core_results", {}).get("total_files", 0) + \
                     d[version_tag].get("dep_results/collective", {}).get("total_files", 0)
-        compare_table.add_row([version_tag, len(total_components[version_tag]), total_files, len(total_components[version_tag]) - total_files])
+        compare_table.add_row([version_tag, total_package_count[version_tag], total_files, len(total_excluded_components[version_tag])])
 
     table = PrettyTable()
     table.field_names = ["Product Version", "Core Components", "Dep Components", "Core Results", "Dep Results", "Dep Top-25 CWE Results", "Other Dep Results"]
@@ -154,18 +160,16 @@ def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     total_table.add_row(["\033[1mTotal\033[0m", total_core_files + total_dep_files, total_core_errors + total_dep_errors])
 
     with open(os.path.join(parent_dir, stats_file_name), "w") as file:
-        file.write("Meta Stats: Component Scanned & Not Scanned:\n")
-        file.write(str(compare_table))
-        file.write("\n\n")
-        file.write("Detailed Stats:\n")
-        file.write(str(table))
-        file.write("\n\n")
-        file.write("Total Components & Results:\n")
-        file.write(str(total_table))
-        file.write("\n\n")
-        print(compare_table)
-        print(table)
-        print(total_table)
+        write_and_print(file, "Detailed Stats:\n")
+        write_and_print(file, str(table))
+        write_and_print(file, "Total Components & Results:\n")
+        write_and_print(file, str(total_table))
+        write_and_print(file, "Meta Stats: Component Scanned & Not Scanned:\n")
+        write_and_print(file, str(compare_table))
+        write_and_print(file, "Following list of packages are not been scanned:")
+        for key, values in total_excluded_components.items():
+            exclude_text = f"* Tags: {key} => {values}"
+            write_and_print(file, exclude_text)
 
 def iterate_and_generate(config_data, parent_dir, temp_dir):
     manifest_tasklists = get_manifest()
@@ -173,9 +177,11 @@ def iterate_and_generate(config_data, parent_dir, temp_dir):
 
     for brew_tags in config_data['brew_tags']:
         for version in brew_tags:
+            total_excluded_components[version] = []
             version_dir = os.path.join(parent_dir, temp_dir, version)
             os.makedirs(version_dir, exist_ok=True)
             package_names = get_package_list(version)
+            total_package_count[version] = len(package_names)
 
             with ThreadPoolExecutor(max_workers=400) as executor:
                 futures = []
@@ -202,10 +208,8 @@ config_data = {}
 with open('config.json') as config_file:
     config_data = json.load(config_file)
 
-create_manifest(config_data.get('related_comments', []))
+manifest_path = create_manifest(config_data.get('related_comments', []))
 iterate_and_generate(config_data, parent_dir, temp_dir)
 shutil.rmtree(latest_dir)
-print(os.getcwd())
 shutil.copytree(parent_dir, latest_dir)
-
-
+os.remove(manifest_path)

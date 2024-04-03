@@ -53,7 +53,7 @@ def main():
     root_dir = os.path.join(os.getcwd(), "temp")
     runner_log_dir = os.path.join(os.getcwd(), "runner_log")
     current_datetime = datetime.now().strftime("%Y%m%d:%H%M")
-    logging.basicConfig(filename='runner_{}.log'.format(current_datetime), level=logging.INFO)
+    logging.basicConfig(filename=os.path.join(runner_log_dir, 'runner_{}.log'.format(current_datetime)), level=logging.INFO)
     os.makedirs(root_dir, exist_ok=True)
     os.makedirs(runner_log_dir, exist_ok=True)
     os.chdir(root_dir)
