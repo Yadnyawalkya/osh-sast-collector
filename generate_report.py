@@ -4,41 +4,26 @@ import subprocess
 import tarfile
 import re
 import threading
-from datetime import date
 import shutil
-import os
-import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 from prettytable import PrettyTable
 
 from local_manifest import create_manifest, get_manifest
 from package_action import find_package, get_package_list
 
-current_date = date.today()
-TASK_LIST = []
-all_entries = []
-d = {}
-
-# dir structure
-# reports -> version_dir
-with open('config.json') as config_file:
-    config_data = json.load(config_file)
-
-parent_dir = os.path.join(os.getcwd(), f"reports-{current_date}")
-stats_file_name = f"stats-{current_date}.txt"
-if not os.path.exists(parent_dir):
-    os.makedirs(parent_dir)
+current_datetime = datetime.now().strftime("%Y%m%d:%H%M")
+root_dir = os.path.join(os.getcwd(), "all_reports")
+latest_dir = os.path.join(root_dir, "latest")
+parent_dir = os.path.join(root_dir, f"reports-{current_datetime}")
+stats_file_name = f"stats-{current_datetime}.txt"
 temp_dir = os.path.join(parent_dir, "temp")
-if not os.path.exists(temp_dir):
-    os.makedirs(temp_dir, exist_ok=True)
-create_manifest(config_data['related_comments'])
-manifest_tasklists = get_manifest()
-os.chdir(parent_dir)
+os.makedirs(root_dir, exist_ok=True)
+os.makedirs(latest_dir, exist_ok=True)
+os.makedirs(parent_dir, exist_ok=True)
+os.makedirs(temp_dir, exist_ok=True)
 
-
-def extract_scan_results_err(file_name, tar_file_path, version):
-    version_dir = os.path.join(parent_dir, temp_dir, version)
-    os.makedirs(version_dir, exist_ok=True)
-    
+def extract_scan_results_err(file_name, tar_file_path, version, config_data):
     core_dir = os.path.join(parent_dir, version, 'core_results')
     dep_dir = os.path.join(parent_dir, version, 'dep_results')
     os.makedirs(core_dir, exist_ok=True)
@@ -80,12 +65,11 @@ def extract_scan_results_err(file_name, tar_file_path, version):
                         os.rename(os.path.join(output_dir, member.name), destination_dir)
                         shutil.rmtree(os.path.join(output_dir, member.name.split("/")[0]))
 
-def process_file(file_name, tar_file_path, version):
-    extract_scan_results_err(file_name, tar_file_path, version)
+def process_file(file_name, tar_file_path, version, config_data):
+    extract_scan_results_err(file_name, tar_file_path, version, config_data)
 
-def prepare_stats():
+def prepare_stats(parent_dir, d):
     error_pattern = r'^Error: '
-
     for version in os.listdir(parent_dir):
         version_data = {}
         for dir_name in ["core_results", "dep_results", "dep_results/collective"]:
@@ -93,7 +77,7 @@ def prepare_stats():
             file_count = 0  # initializing file count for each directory
             dir_path = os.path.join(parent_dir, version, dir_name)
             if os.path.isdir(dir_path):
-                for root, dirs, files in os.walk(dir_path):
+                for root, _, files in os.walk(dir_path):
                     file_count += len(files)  # incrementing file count for each file found
                     dep_count = 0
                     for file in files:
@@ -104,8 +88,6 @@ def prepare_stats():
                                     if re.match(error_pattern, line):
                                         total_errors += 1
                                         dep_count += 1
-                                    else:
-                                        print(line)
                         if "dep-top25-cwe-sorted.err" in file:
                             version_data.setdefault(dir_name, {}).update({'top25_cwe': dep_count})
                             dep_count = 0
@@ -115,37 +97,24 @@ def prepare_stats():
             if dir_name in ("core_results", "dep_results/collective"):
                 version_data.setdefault(dir_name, {}).update({'total_files': file_count, 'total_errors': total_errors})  # Storing both file count and total errors
         d[version] = version_data
-
-
-def iterate_and_generate():
-    for brew_tags in config_data['brew_tags']:
-        for version in brew_tags:
-            version_dir = os.path.join(parent_dir, temp_dir, version)
-            if not os.path.exists(version_dir):
-                os.makedirs(version_dir, exist_ok=True)
-            package_names = get_package_list(version)
-            for package_name in package_names:
-                taskid = find_package(package_name)
-                if taskid is not None and taskid in manifest_tasklists:
-                    print("=> {}: Scan found!".format(taskid))
-                    download_command = ["osh-cli", "download-results", str(taskid), "-d", version_dir]
-                    output = subprocess.run(download_command)
-                    print("=> {}: Scan report downloaded!".format(taskid))
-                    TASK_LIST.append(taskid)
-
-            for file_name in os.listdir(version_dir):
-                if file_name.endswith(".tar.xz"):
-                    file_path = os.path.join(version_dir, file_name)
-                    thread = threading.Thread(target=process_file, args=(file_name, file_path, version))
-                    thread.start()
-    shutil.rmtree(temp_dir)
-
-    prepare_stats()
-
+    
+def download_and_append_task(package_name, version_dir, manifest_tasklists):
+    taskid = find_package(package_name)
+    if taskid is not None and taskid in manifest_tasklists:
+        print("=> {}: Scan found!".format(taskid))
+        download_command = ["osh-cli", "download-results", str(taskid), "-d", version_dir]
+        result = subprocess.run(download_command)
+        if result.returncode == 0:
+            print("=> {}: Scan report downloaded!".format(taskid))
+            return taskid
+        else:
+            print(f"Failed to download scan report for task {taskid}")
+    return None
+    
+def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     table = PrettyTable()
     table.field_names = ["Product version", "Core Components", "Dep Components", "Core results", "Dep results", "Dep top-25 CWE results", "Other dep results"]
 
-    # populating the table
     for version, data in d.items():
         core_files = data.get("core_results", {}).get("total_files", 0)
         dep_files = data.get("dep_results/collective", {}).get("total_files", 0)
@@ -155,7 +124,6 @@ def iterate_and_generate():
         other_important = data.get("dep_results", {}).get("other_important", 0)
         table.add_row([version, core_files, dep_files, core_errors, dep_errors, top25_cwe, other_important])
 
-    # adding total count row with header style
     total_core_files = sum(data.get("core_results", {}).get("total_files", 0) for data in d.values())
     total_dep_files = sum(data.get("dep_results/collective", {}).get("total_files", 0) for data in d.values())
     total_core_errors = sum(data.get("core_results", {}).get("total_errors", 0) for data in d.values())
@@ -164,26 +132,61 @@ def iterate_and_generate():
     total_other_important = sum(data.get("dep_results", {}).get("other_important", 0) for data in d.values())
     table.add_row([f"\033[1mTotal\033[0m", total_core_files, total_dep_files, total_core_errors, total_dep_errors, total_top25_cwe, total_other_important])
 
-    with open(os.path.join(parent_dir, stats_file_name), "w") as file:
-        file.write(str(table))
-        print(table)
-
-    table2 = PrettyTable()
-    table2.field_names = ["Product version", "All Components", "All findings"]
-
+    total_table = PrettyTable()
+    total_table.field_names = ["Version", "Total Files", "Total Errors"]
+    
     for version, data in d.items():
-        core_files = data.get("core_results", {}).get("total_files", 0)
-        dep_files = data.get("dep_results/collective", {}).get("total_files", 0)
-        core_errors = data.get("core_results", {}).get("total_errors", 0)
-        dep_errors = data.get("dep_results/collective", {}).get("total_errors", 0)
-        total_files = core_files + dep_files
-        total_errors = core_errors + dep_errors
-        table.add_row([version, core_files, dep_files, core_errors, dep_errors])
+        total_files = data.get("core_results", {}).get("total_files", 0) + data.get("dep_results/collective", {}).get("total_files", 0)
+        total_errors = data.get("core_results", {}).get("total_errors", 0) + data.get("dep_results/collective", {}).get("total_errors", 0)
+        total_table.add_row([version, total_files, total_errors])
+    total_table.add_row(["\033[1mTotal\033[0m", total_core_files + total_dep_files, total_core_errors + total_dep_errors])
 
-    table.add_row([f"\033[1mTotal\033[0m", total_files, total_errors])
-
-    with open(os.path.join(parent_dir, stats_file_name), "a+") as file:
-        file.write("\n\n{}".format(str(table)))
+    with open(os.path.join(parent_dir, stats_file_name), "w") as file:
+        file.write("Detailed Stats:\n")
+        file.write(str(table))
+        file.write("\n\n")
+        file.write("Total Files and Errors:\n")
+        file.write(str(total_table))
         print(table)
-   
-iterate_and_generate()
+        print(total_table)
+
+def iterate_and_generate(config_data, parent_dir, temp_dir):
+    manifest_tasklists = get_manifest()
+    d = {}
+
+    for brew_tags in config_data['brew_tags']:
+        for version in brew_tags:
+            version_dir = os.path.join(parent_dir, temp_dir, version)
+            os.makedirs(version_dir, exist_ok=True)
+            package_names = get_package_list(version)
+
+            with ThreadPoolExecutor(max_workers=400) as executor:
+                futures = []
+                for package_name in package_names:
+                    futures.append(executor.submit(download_and_append_task, package_name, version_dir, manifest_tasklists))
+                for future in futures:
+                    future.result()
+
+            with ThreadPoolExecutor(max_workers=400) as executor:
+                futures = []
+                for file_name in os.listdir(version_dir):
+                    if file_name.endswith(".tar.xz"):
+                        file_path = os.path.join(version_dir, file_name)
+                        futures.append(executor.submit(process_file, file_name, file_path, version, config_data))
+                for future in as_completed(futures):
+                    pass
+
+    shutil.rmtree(temp_dir)
+
+    prepare_stats(parent_dir, d)
+    generate_tables_and_write_to_file(d, parent_dir, stats_file_name)
+
+config_data = {}
+with open('config.json') as config_file:
+    config_data = json.load(config_file)
+
+create_manifest(config_data.get('related_comments', []))
+iterate_and_generate(config_data, parent_dir, temp_dir)
+shutil.rmtree(latest_dir)
+print(os.getcwd())
+shutil.copytree(parent_dir, latest_dir)
