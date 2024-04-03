@@ -103,15 +103,18 @@ def prepare_stats(parent_dir, d):
 def download_and_append_task(package_name, version, manifest_tasklists):
     version_dir = os.path.join(parent_dir, temp_dir, version)
     taskid = find_package(package_name)
-    if taskid is not None and taskid in manifest_tasklists:
+    if (taskid is not None) and (taskid in manifest_tasklists):
         print("=> {}: Scan found!".format(taskid))
         download_command = ["osh-cli", "download-results", str(taskid), "-d", version_dir]
-        result = subprocess.run(download_command)
-        if result.returncode == 0:
+        process = subprocess.Popen(download_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, error = process.communicate()
+        if process.returncode == 0:
             print("=> {}: Scan report downloaded!".format(taskid))
             return taskid
         else:
             print(f"Failed to download scan report for task {taskid}")
+            # Print the error message, if any
+            print("Error:", error.decode())
     else:
         total_excluded_components[version].append(package_name)
     return None

@@ -1,7 +1,7 @@
 import subprocess
 
 def find_package(package_name, latest=False):
-    scan_command = ['osh-cli', 'find-tasks', "--states=CLOSED", "--latest", "{}".format(package_name)]
+    scan_command = ['osh-cli', 'find-tasks', "--states=CLOSED", "--latest", "-r", "{}".format(package_name)]
     output = subprocess.run(scan_command, capture_output=True, text=True)
     output_lines = output.stdout.splitlines()
     if output_lines:
