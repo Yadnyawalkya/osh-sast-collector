@@ -18,6 +18,8 @@ latest_dir = os.path.join(root_dir, "latest")
 parent_dir = os.path.join(root_dir, f"reports-{current_datetime}")
 stats_file_name = f"stats-{current_datetime}.txt"
 temp_dir = os.path.join(parent_dir, "temp")
+excluded_packages = []
+total_components = {}
 os.makedirs(root_dir, exist_ok=True)
 os.makedirs(latest_dir, exist_ok=True)
 os.makedirs(parent_dir, exist_ok=True)
@@ -98,7 +100,8 @@ def prepare_stats(parent_dir, d):
                 version_data.setdefault(dir_name, {}).update({'total_files': file_count, 'total_errors': total_errors})  # Storing both file count and total errors
         d[version] = version_data
     
-def download_and_append_task(package_name, version_dir, manifest_tasklists):
+def download_and_append_task(package_name, version, manifest_tasklists):
+    version_dir = os.path.join(parent_dir, temp_dir, version)
     taskid = find_package(package_name)
     if taskid is not None and taskid in manifest_tasklists:
         print("=> {}: Scan found!".format(taskid))
@@ -109,11 +112,20 @@ def download_and_append_task(package_name, version_dir, manifest_tasklists):
             return taskid
         else:
             print(f"Failed to download scan report for task {taskid}")
+    else:
+        total_components[version].append(package_name)
     return None
     
 def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
+    compare_table = PrettyTable()
+    compare_table.field_names = ["Version Tag", "Total component present", "Total components scanned", "Unscanned"]
+    for version_tag in total_components.keys() & d.keys():
+        total_files = d[version_tag].get("core_results", {}).get("total_files", 0) + \
+                    d[version_tag].get("dep_results/collective", {}).get("total_files", 0)
+        compare_table.add_row([version_tag, len(total_components[version_tag]), total_files, len(total_components[version_tag]) - total_files])
+
     table = PrettyTable()
-    table.field_names = ["Product version", "Core Components", "Dep Components", "Core results", "Dep results", "Dep top-25 CWE results", "Other dep results"]
+    table.field_names = ["Product Version", "Core Components", "Dep Components", "Core Results", "Dep Results", "Dep Top-25 CWE Results", "Other Dep Results"]
 
     for version, data in d.items():
         core_files = data.get("core_results", {}).get("total_files", 0)
@@ -133,7 +145,7 @@ def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     table.add_row([f"\033[1mTotal\033[0m", total_core_files, total_dep_files, total_core_errors, total_dep_errors, total_top25_cwe, total_other_important])
 
     total_table = PrettyTable()
-    total_table.field_names = ["Version", "Total Files", "Total Errors"]
+    total_table.field_names = ["Product Version", "Total Components", "Total Results"]
     
     for version, data in d.items():
         total_files = data.get("core_results", {}).get("total_files", 0) + data.get("dep_results/collective", {}).get("total_files", 0)
@@ -142,11 +154,16 @@ def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     total_table.add_row(["\033[1mTotal\033[0m", total_core_files + total_dep_files, total_core_errors + total_dep_errors])
 
     with open(os.path.join(parent_dir, stats_file_name), "w") as file:
+        file.write("Meta Stats: Component Scanned & Not Scanned:\n")
+        file.write(str(compare_table))
+        file.write("\n\n")
         file.write("Detailed Stats:\n")
         file.write(str(table))
         file.write("\n\n")
-        file.write("Total Files and Errors:\n")
+        file.write("Total Components & Results:\n")
         file.write(str(total_table))
+        file.write("\n\n")
+        print(compare_table)
         print(table)
         print(total_table)
 
@@ -163,7 +180,7 @@ def iterate_and_generate(config_data, parent_dir, temp_dir):
             with ThreadPoolExecutor(max_workers=400) as executor:
                 futures = []
                 for package_name in package_names:
-                    futures.append(executor.submit(download_and_append_task, package_name, version_dir, manifest_tasklists))
+                    futures.append(executor.submit(download_and_append_task, package_name, version, manifest_tasklists))
                 for future in futures:
                     future.result()
 
@@ -190,3 +207,5 @@ iterate_and_generate(config_data, parent_dir, temp_dir)
 shutil.rmtree(latest_dir)
 print(os.getcwd())
 shutil.copytree(parent_dir, latest_dir)
+
+
