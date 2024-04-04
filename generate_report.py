@@ -154,7 +154,7 @@ def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     table.add_row([f"\033[1mTotal\033[0m", total_core_files, total_dep_files, total_core_errors, total_dep_errors, total_top25_cwe, total_other_important])
 
     total_table = PrettyTable()
-    total_table.field_names = ["Product Version", "Total Components", "Total Results"]
+    total_table.field_names = ["Product Version", "Total Components Scanned", "Total Results"]
     
     for version, data in d.items():
         total_files = data.get("core_results", {}).get("total_files", 0) + data.get("dep_results/collective", {}).get("total_files", 0)
@@ -165,7 +165,7 @@ def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     with open(os.path.join(parent_dir, stats_file_name), "w") as file:
         write_and_print(file, "Detailed Stats:\n")
         write_and_print(file, str(table))
-        write_and_print(file, "Total Components & Results:\n")
+        write_and_print(file, "Total Components Scanned & Results:\n")
         write_and_print(file, str(total_table))
         write_and_print(file, "Meta Stats: Component Scanned & Not Scanned:\n")
         write_and_print(file, str(compare_table))

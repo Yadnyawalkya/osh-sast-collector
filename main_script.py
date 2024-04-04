@@ -4,7 +4,7 @@ import json
 import hashlib
 from local_manifest import get_manifest, create_manifest, lookup_in_manifest
 from package_action import get_package_list
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 import shutil
 from datetime import datetime
 import logging
@@ -38,7 +38,7 @@ def download_packages(version_dir, manifest_tasklists, package_name):
     exclude_text = "No src packages available for "
     os.chdir(version_dir)
     if lookup_in_manifest(package_name, manifest_tasklists):
-        continue
+        pass
     else:
         os.chdir(version_dir)
         download_command = ['brew', 'download-build', '--noprogress', '--arch=src', package_name]
@@ -53,10 +53,11 @@ def main():
     root_dir = os.path.join(os.getcwd(), "temp")
     runner_log_dir = os.path.join(os.getcwd(), "runner_log")
     current_datetime = datetime.now().strftime("%Y%m%d:%H%M")
-    logging.basicConfig(filename=os.path.join(runner_log_dir, 'runner_{}.log'.format(current_datetime)), level=logging.INFO)
     os.makedirs(root_dir, exist_ok=True)
     os.makedirs(runner_log_dir, exist_ok=True)
     os.chdir(root_dir)
+    log_file_name = os.path.join(runner_log_dir, 'runner_{}.log'.format(current_datetime))
+    logging.basicConfig(filename=log_file_name, level=logging.INFO)
     create_manifest(config_data['related_comments'])
     #TODO: take argument later which decides wheather to scan 17.1 or 18 or both
     all_tags = config_data['brew_tags']
@@ -73,16 +74,27 @@ def main():
             with ThreadPoolExecutor(max_workers=200) as executor:
                 futures = []
                 for package_name in package_names:
-                    futures.append(executor.submit(download_packages, version_dir, manifest_tasklists, file_name))           
+                    futures.append(executor.submit(download_packages, version_dir, manifest_tasklists, package_name))           
                 for future in futures:
                     future.result()
 
             with ThreadPoolExecutor(max_workers=200) as executor:
-                futures = []
-                for file_name in os.listdir():
-                    futures.append(executor.submit(scan_packages(version_dir, file_name)))
+                futures = [executor.submit(download_packages, version_dir, manifest_tasklists, package_name) for package_name in package_names]
+                wait(futures, timeout=None, return_when=ALL_COMPLETED)
                 for future in futures:
-                    future.result()
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        print(f"An error occurred: {e}")
+
+            with ThreadPoolExecutor(max_workers=200) as executor:
+                futures = [executor.submit(scan_packages, version_dir, file_name) for file_name in os.listdir()]
+                wait(futures, timeout=None, return_when=ALL_COMPLETED)
+                for future in futures:
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        print(f"An error occurred: {e}")
             os.chdir(root_dir)
 
     if excluded_packages: # printing if there is list has excluded packages
