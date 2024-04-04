@@ -18,8 +18,7 @@ latest_dir = os.path.join(root_dir, "latest")
 parent_dir = os.path.join(root_dir, f"reports-{current_datetime}")
 stats_file_name = f"stats-{current_datetime}.txt"
 temp_dir = os.path.join(parent_dir, "temp")
-total_excluded_components_first = {}
-total_excluded_components_second = {}
+total_excluded_components = {}
 total_package_count = {}
 os.makedirs(root_dir, exist_ok=True)
 os.makedirs(latest_dir, exist_ok=True)
@@ -101,7 +100,7 @@ def prepare_stats(parent_dir, d):
                 version_data.setdefault(dir_name, {}).update({'total_files': file_count, 'total_errors': total_errors})  # Storing both file count and total errors
         d[version] = version_data
     
-def download_and_append_task_first(package_name, version, manifest_tasklists):
+def download_and_append_task(package_name, version, manifest_tasklists):
     version_dir = os.path.join(parent_dir, temp_dir, version)
     taskid = find_package(package_name)
     if (taskid is not None) and (taskid in manifest_tasklists):
@@ -114,23 +113,18 @@ def download_and_append_task_first(package_name, version, manifest_tasklists):
         else:
             print(f"Failed to download scan report for task {taskid}")
     else:
-        total_excluded_components_first[version].append(package_name)
-    return None
-
-def download_and_append_task_second(package_name, version, manifest_tasklists):
-    version_dir = os.path.join(parent_dir, temp_dir, version)
-    taskid = find_in_failed_list(package_name)
-    if (taskid is not None) and (taskid in manifest_tasklists):
-        print("=> {}: Scan found!".format(taskid))
-        download_command = ["osh-cli", "download-results", str(taskid), "-d", version_dir]
-        result = subprocess.run(download_command)
-        if result.returncode == 0:
-            print("=> {}: Scan report downloaded!".format(taskid))
-            return taskid
+        taskid = find_in_failed_list(package_name)
+        if (taskid is not None) and (taskid in manifest_tasklists):
+            print("=> {}: Scan found!".format(taskid))
+            download_command = ["osh-cli", "download-results", str(taskid), "-d", version_dir]
+            result = subprocess.run(download_command)
+            if result.returncode == 0:
+                print("=> {}: Scan report downloaded!".format(taskid))
+                return taskid
+            else:
+                print(f"Failed to download scan report for task {taskid}")
         else:
-            print(f"Failed to download scan report for task {taskid}")
-    else:
-        total_excluded_components_second[version].append(package_name)
+            total_excluded_components[version].append(package_name)
     return None
 
 def write_and_print(file, content):
@@ -142,10 +136,10 @@ def write_and_print(file, content):
 def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     compare_table = PrettyTable()
     compare_table.field_names = ["Version Tag", "Total component present", "Total components scanned", "Unscanned"]
-    for version_tag in total_excluded_components_second.keys() & d.keys() & total_package_count.keys():
+    for version_tag in total_excluded_components.keys() & d.keys() & total_package_count.keys():
         total_files = d[version_tag].get("core_results", {}).get("total_files", 0) + \
                     d[version_tag].get("dep_results/collective", {}).get("total_files", 0)
-        compare_table.add_row([version_tag, total_package_count[version_tag], total_files, len(total_excluded_components_second[version_tag])])
+        compare_table.add_row([version_tag, total_package_count[version_tag], total_files, len(total_excluded_components[version_tag])])
 
     table = PrettyTable()
     table.field_names = ["Product Version", "Core Components", "Dep Components", "Core Results", "Dep Results", "Dep Top-25 CWE Results", "Other Dep Results"]
@@ -184,7 +178,7 @@ def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
         write_and_print(file, "Meta Stats: Component Scanned & Not Scanned:\n")
         write_and_print(file, str(compare_table))
         write_and_print(file, "Following list of packages are not been scanned:")
-        for key, values in total_excluded_components_second.items():
+        for key, values in total_excluded_components.items():
             exclude_text = f"* Tags: {key} => {values}"
             write_and_print(file, exclude_text)
 
@@ -194,8 +188,7 @@ def iterate_and_generate(config_data, parent_dir, temp_dir):
 
     for brew_tags in config_data['brew_tags']:
         for version in brew_tags:
-            total_excluded_components_first[version] = []
-            total_excluded_components_second[version] = []
+            total_excluded_components[version] = []
             version_dir = os.path.join(parent_dir, temp_dir, version)
             os.makedirs(version_dir, exist_ok=True)
             package_names = get_package_list(version)
@@ -204,14 +197,7 @@ def iterate_and_generate(config_data, parent_dir, temp_dir):
             with ThreadPoolExecutor(max_workers=400) as executor:
                 futures = []
                 for package_name in package_names:
-                    futures.append(executor.submit(download_and_append_task_first, package_name, version, manifest_tasklists))
-                for future in futures:
-                    future.result()
-
-            with ThreadPoolExecutor(max_workers=400) as executor:
-                futures = []
-                for package_name in total_excluded_components_second.get(version, {}):
-                    futures.append(executor.submit(download_and_append_task_second, package_name, version, manifest_tasklists))
+                    futures.append(executor.submit(download_and_append_task, package_name, version, manifest_tasklists))
                 for future in futures:
                     future.result()
 
