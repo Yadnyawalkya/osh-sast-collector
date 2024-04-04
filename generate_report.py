@@ -109,37 +109,34 @@ def download_and_append_task(package_name, version, manifest_tasklists):
         result = subprocess.run(download_command)
         if result.returncode == 0:
             print("=> {}: Scan report downloaded!".format(taskid))
-            return taskid
         else:
             print(f"Failed to download scan report for task {taskid}")
     else:
-        taskid = find_in_failed_list(package_name)
-        if (taskid is not None) and (taskid in manifest_tasklists):
+        scan_command = ['osh-cli', 'find-tasks', "--states=FAILED", "--latest", "-r", "{}".format(package_name)]
+        output = subprocess.run(scan_command, capture_output=True, text=True)
+        output_lines = output.stdout.splitlines()
+        if output_lines:
+            taskid = int(output_lines[0])
+        else:
+            taskid = None
+        if (taskid is not None):
             print("=> {}: Scan found!".format(taskid))
             download_command = ["osh-cli", "download-results", str(taskid), "-d", version_dir]
             result = subprocess.run(download_command)
             if result.returncode == 0:
                 print("=> {}: Scan report downloaded!".format(taskid))
-                return taskid
             else:
                 print(f"Failed to download scan report for task {taskid}")
         else:
             total_excluded_components[version].append(package_name)
-    return None
 
 def write_and_print(file, content):
     file.write(content)
     print(content, end='')
-    file.write("\n\n")
-    print("\n\n")
+    file.write("\n")
+    print("\n")
 
 def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
-    compare_table = PrettyTable()
-    compare_table.field_names = ["Version Tag", "Total component present", "Total components scanned", "Unscanned"]
-    for version_tag in total_excluded_components.keys() & d.keys() & total_package_count.keys():
-        total_files = d[version_tag].get("core_results", {}).get("total_files", 0) + \
-                    d[version_tag].get("dep_results/collective", {}).get("total_files", 0)
-        compare_table.add_row([version_tag, total_package_count[version_tag], total_files, len(total_excluded_components[version_tag])])
 
     table = PrettyTable()
     table.field_names = ["Product Version", "Core Components", "Dep Components", "Core Results", "Dep Results", "Dep Top-25 CWE Results", "Other Dep Results"]
@@ -159,25 +156,34 @@ def generate_tables_and_write_to_file(d, parent_dir, stats_file_name):
     total_dep_errors = sum(data.get("dep_results/collective", {}).get("total_errors", 0) for data in d.values())
     total_top25_cwe = sum(data.get("dep_results", {}).get("top25_cwe", 0) for data in d.values())
     total_other_important = sum(data.get("dep_results", {}).get("other_important", 0) for data in d.values())
-    table.add_row([f"\033[1mTotal\033[0m", total_core_files, total_dep_files, total_core_errors, total_dep_errors, total_top25_cwe, total_other_important])
+    table.add_row([f"Total", total_core_files, total_dep_files, total_core_errors, total_dep_errors, total_top25_cwe, total_other_important])
 
     total_table = PrettyTable()
-    total_table.field_names = ["Product Version", "Total Components Scanned", "Total Results"]
-    
+    total_table.field_names = ["Product Version", "All Components", "Unscanned", "Scanned", "Total Findings"]
+
+    total_all_components = 0
+    total_unscanned = 0
+    total_scanned = 0
+    total_findings = 0
+
     for version, data in d.items():
         total_files = data.get("core_results", {}).get("total_files", 0) + data.get("dep_results/collective", {}).get("total_files", 0)
         total_errors = data.get("core_results", {}).get("total_errors", 0) + data.get("dep_results/collective", {}).get("total_errors", 0)
-        total_table.add_row([version, total_files, total_errors])
-    total_table.add_row(["\033[1mTotal\033[0m", total_core_files + total_dep_files, total_core_errors + total_dep_errors])
+        total_unscanned_version = len(total_excluded_components.get(version, []))
+        total_table.add_row([version, total_package_count.get(version, 0), total_unscanned_version, total_files, total_errors])
+
+        total_all_components += total_package_count.get(version, 0)
+        total_unscanned += total_unscanned_version
+        total_scanned += total_files
+        total_findings += total_errors
+    total_table.add_row(["Total", total_all_components, total_unscanned, total_scanned, total_findings])
 
     with open(os.path.join(parent_dir, stats_file_name), "w") as file:
         write_and_print(file, "Detailed Stats:\n")
         write_and_print(file, str(table))
-        write_and_print(file, "Total Components Scanned & Results:\n")
+        write_and_print(file, "\n\nTotal Components Scanned & Results:\n")
         write_and_print(file, str(total_table))
-        write_and_print(file, "Meta Stats: Component Scanned & Not Scanned:\n")
-        write_and_print(file, str(compare_table))
-        write_and_print(file, "Following list of packages are not been scanned:")
+        write_and_print(file, "\n\nFollowing list of packages are not been scanned:")
         for key, values in total_excluded_components.items():
             exclude_text = f"* Tags: {key} => {values}"
             write_and_print(file, exclude_text)
