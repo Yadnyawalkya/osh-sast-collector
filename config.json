@@ -4,10 +4,9 @@
       "rhos-17.1-rhel-9"
     ],
     [
-      "rhos-18.0-rhel-9-candidate",
-      "rhos-podified-trunk-0.1-rhel-9-candidate",
-      "rhos-edpm-trunk-0.1-rhel-9-candidate",
-      "rhos-edpm-trunk-0.1-rhel-8-candidate"
+      "rhoso-18.0-rhel-9-candidate",
+      "rhoso-podified-1.0-rhel-9-candidate",
+      "rhoso-edpm-1.0-rhel-9-container"    
     ]
   ],
   "related_comments": [
