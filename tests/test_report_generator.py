@@ -34,7 +34,7 @@ def test_empty_data_report():
     result = generate_report(mock_data)
 
     # Assuming it returns a default report or error
-    assert "task_id" not in result  # Adjust based on your function's behavior
+    assert "task_id" not in result
     assert "task_name" not in result
     assert "related_comments" not in result
 
@@ -63,7 +63,7 @@ def test_missing_parameters():
     assert "related_comments" in result
 
 
-# Test case 5: Test report generation in JSON format (Assuming your function supports format choice)
+# Test case 5: Test report generation in JSON format 
 def test_json_report_format():
     mock_data = {
         "task_id": "12345",

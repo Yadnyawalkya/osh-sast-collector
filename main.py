@@ -20,7 +20,7 @@ def read_config():
 
 
 def scan_packages(package_name):
-    #TODO: Remove this hardcoding for other products
+    # TODO: Remove this hardcoding for other products
     scan_id = (
         "openstack"
         if (".el8ost" not in package_name and ".el9ost" not in package_name)
@@ -54,7 +54,7 @@ def main():
     for brew_tags in all_tags:
         for version in brew_tags:
             package_names = get_package_list(version)
-            with ProcessPoolExecutor(max_workers=300) as executor:
+            with ProcessPoolExecutor(max_workers=10) as executor:
                 futures = []
                 for package_name in package_names:
                     if manifest_lookup_cache.get(package_name) is None:

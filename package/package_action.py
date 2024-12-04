@@ -28,7 +28,7 @@ def get_package_list(version):
     return package_names
 
 
-#Due to bug; couple container builds are failing, we're also considering them
+#Due to some bug in OSH; couple container builds are failing so keep this hack until that fixes
 def find_in_failed_list(package_name, latest=False):
     scan_command = [
         "osh-cli",
