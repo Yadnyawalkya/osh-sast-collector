@@ -20,6 +20,7 @@ def find_package(package_name, latest=False):
 
 
 def get_package_list(version):
+    #TODO: Replace commands with Brew API
     list_command = ["brew", "latest-pkg", "--all", version]
     command_output = subprocess.run(list_command, capture_output=True, text=True)
     output_lines = command_output.stdout.strip().split("\n")[2:]
@@ -27,7 +28,7 @@ def get_package_list(version):
     return package_names
 
 
-# due to bug
+#Due to bug; couple container builds are failing, we're also considering them
 def find_in_failed_list(package_name, latest=False):
     scan_command = [
         "osh-cli",

@@ -20,6 +20,7 @@ def read_config():
 
 
 def scan_packages(package_name):
+    #TODO: Remove this hardcoding for other products
     scan_id = (
         "openstack"
         if (".el8ost" not in package_name and ".el9ost" not in package_name)
